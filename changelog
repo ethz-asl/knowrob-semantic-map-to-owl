@@ -1,0 +1,5 @@
+knowrob-semantic-map-to-owl (1.0.0-1) unstable; urgency=low
+
+  * Initial commit with package sources from knowrob_addons/semantic_map_to_owl
+
+ -- Ralf Kaestner <ralf.kaestner@gmail.com>  Fri, 20 Mar 2015 15:23:00 +0100
