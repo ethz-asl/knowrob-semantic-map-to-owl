@@ -1,3 +1,9 @@
+knowrob-semantic-map-to-owl (1.0.0-2) unstable; urgency=low
+
+  * Build system, package dependency, and message naming patches
+
+ -- Ralf Kaestner <ralf.kaestner@gmail.com>  Fri, 20 Mar 2015 15:26:00 +0100
+
 knowrob-semantic-map-to-owl (1.0.0-1) unstable; urgency=low
 
   * Initial commit with package sources from knowrob_addons/semantic_map_to_owl

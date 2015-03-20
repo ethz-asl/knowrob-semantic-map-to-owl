@@ -16,7 +16,7 @@
 
 
 try {
-    project.catkin.tree.generateMessageArtifact(project, 'semantic_map_to_owl')
+    project.catkin.tree.generateMessageArtifact(project, 'knowrob_semantic_map_msgs')
 } catch (NullPointerException e) {
-    println("Couldn't find foo_msgs on the ROS_PACKAGE_PATH")
+    println("Couldn't find knowrob_semantic_map_msgs on the ROS_PACKAGE_PATH")
 }

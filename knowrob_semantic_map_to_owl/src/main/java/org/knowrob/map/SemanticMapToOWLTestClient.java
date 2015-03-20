@@ -9,7 +9,7 @@ import org.ros.node.ConnectedNode;
 import org.ros.node.service.ServiceClient;
 import org.ros.node.service.ServiceResponseListener;
 
-import semantic_map_to_owl.SemMapObject;
+import knowrob_semantic_map_msgs.SemMapObject;
 
 
 public class SemanticMapToOWLTestClient extends AbstractNodeMain {
@@ -26,10 +26,10 @@ public class SemanticMapToOWLTestClient extends AbstractNodeMain {
 		
 		this.node = connectedNode;
 		
-		ServiceClient<semantic_map_to_owl.GenerateSemanticMapOWLRequest, semantic_map_to_owl.GenerateSemanticMapOWLResponse> serviceClient;
+		ServiceClient<knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest, knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse> serviceClient;
 		
 		try {
-			serviceClient = connectedNode.newServiceClient("knowrob_semantic_map_to_owl/generate_owl_map", semantic_map_to_owl.GenerateSemanticMapOWL._TYPE);
+			serviceClient = connectedNode.newServiceClient("knowrob_semantic_map_to_owl/generate_owl_map", knowrob_semantic_map_msgs.GenerateSemanticMapOWL._TYPE);
 			
 		} catch (ServiceNotFoundException e) {
 			throw new RosRuntimeException(e);
@@ -37,7 +37,7 @@ public class SemanticMapToOWLTestClient extends AbstractNodeMain {
 
 
 		// create semantic map message
-		final semantic_map_to_owl.GenerateSemanticMapOWLRequest req = serviceClient.newMessage();
+		final knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest req = serviceClient.newMessage();
 		
 		// Set the IRI for the map that will be created
 		req.getMap().getHeader().setFrameId("http://www.example.com/foo.owl#");
@@ -112,9 +112,9 @@ public class SemanticMapToOWLTestClient extends AbstractNodeMain {
 		req.getMap().getObjects().add(handle);
 
 		
-		serviceClient.call(req, new ServiceResponseListener<semantic_map_to_owl.GenerateSemanticMapOWLResponse>() {
+		serviceClient.call(req, new ServiceResponseListener<knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse>() {
 			@Override
-			public void onSuccess(semantic_map_to_owl.GenerateSemanticMapOWLResponse response) {
+			public void onSuccess(knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse response) {
 				
 				connectedNode.getLog().info(
 						String.format("%s", response.getOwlmap()));

@@ -14,5 +14,4 @@
  * the License.
  */
 
-include 'semantic_map_to_owl'
-include 'semantic_map_to_owl_msgs'
+include 'knowrob_semantic_map_to_owl'

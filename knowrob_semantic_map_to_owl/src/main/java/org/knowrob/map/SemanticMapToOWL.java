@@ -18,7 +18,7 @@ import org.knowrob.owl.ObjectInstance;
 import org.knowrob.owl.utils.OWLFileUtils;
 import org.knowrob.owl.utils.OWLImportExport;
 
-import semantic_map_to_owl.SemMapObject;
+import knowrob_semantic_map_msgs.SemMapObject;
 
 
 /**
@@ -43,7 +43,7 @@ public class SemanticMapToOWL  extends AbstractNodeMain {
 
 		this.node = connectedNode;
 		connectedNode.newServiceServer("knowrob_semantic_map_to_owl/generate_owl_map", 
-				semantic_map_to_owl.GenerateSemanticMapOWL._TYPE,
+				knowrob_semantic_map_msgs.GenerateSemanticMapOWL._TYPE,
 				new ConvertToOwlCallback());
 	}
 
@@ -55,10 +55,10 @@ public class SemanticMapToOWL  extends AbstractNodeMain {
 	 * @author Moritz Tenorth, tenorth@cs.tum.edu
 	 *
 	 */
-	class ConvertToOwlCallback implements ServiceResponseBuilder<semantic_map_to_owl.GenerateSemanticMapOWLRequest, semantic_map_to_owl.GenerateSemanticMapOWLResponse> {
+	class ConvertToOwlCallback implements ServiceResponseBuilder<knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest, knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse> {
 
 		@Override
-		public void build(semantic_map_to_owl.GenerateSemanticMapOWLRequest req, semantic_map_to_owl.GenerateSemanticMapOWLResponse res) {
+		public void build(knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest req, knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse res) {
 
 			res.setOwlmap("");
 

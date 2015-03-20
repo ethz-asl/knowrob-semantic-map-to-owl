@@ -15,7 +15,7 @@
  */
 
 /* This plugin is necessary for creating installApp tasks (i.e. executables) */
-apply plugin: 'application'
+apply plugin: 'ros-application'
 mainClassName = 'org.ros.RosRun'
 
 /* 
@@ -27,16 +27,9 @@ mainClassName = 'org.ros.RosRun'
 */
 
 dependencies {
-  compile project(':semantic_map_to_owl_msgs')
+  compile 'org.ros.rosjava_messages:knowrob_semantic_map_msgs:[1.0.0,)'
   compile 'org.ros.rosjava_core:rosjava:[0.1,)'
   compile 'org.knowrob.knowrob_common:knowrob_common:[0.1,)'
   compile 'net.sourceforge.owlapi:owlapi-distribution:3.5.0'
-}
-
-task writeClasspath << {
-    buildDir.mkdirs()
-    new File(buildDir, "classpath.txt").text = configurations.runtime.asPath +
-                                               ":" + buildDir + "/libs/" +
-                                               project.name + "-" +
-                                               project.version + ".jar" + "\n"
+  compile files('/usr/share/java/vecmath.jar')
 }
