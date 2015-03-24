@@ -1,141 +1,265 @@
 package org.knowrob.map;
 
 import java.text.SimpleDateFormat;
+
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
+
+import javax.vecmath.Quat4d;
+import javax.vecmath.Vector3d;
 
 import org.ros.namespace.GraphName;
 import org.ros.node.AbstractNodeMain;
 import org.ros.node.ConnectedNode;
 import org.ros.node.parameter.ParameterTree;
 import org.ros.node.service.ServiceResponseBuilder;
+
+import org.semanticweb.owlapi.apibinding.OWLManager;
+import org.semanticweb.owlapi.io.RDFXMLOntologyFormat;
 import org.semanticweb.owlapi.model.*;
 
 import org.knowrob.owl.OWLClass;
 import org.knowrob.owl.ObjectInstance;
 import org.knowrob.owl.utils.OWLFileUtils;
 import org.knowrob.owl.utils.OWLImportExport;
+import org.knowrob.owl.utils.PackageIRIMapper;
 
+import knowrob_semantic_map_msgs.SemMapDataProperty;
 import knowrob_semantic_map_msgs.SemMapObject;
-
+import knowrob_semantic_map_msgs.SemMapObjectProperty;
 
 /**
- * ROS service to convert a mod_semantic_map/SemMap message into an OWL description
- * 
- * @author Moritz Tenorth, tenorth@cs.tum.edu
- * @author Lars Kunze, kunzel@cs.tum.edu
- *
- */
+* ROS service to convert a mod_semantic_map/SemMap message into an OWL
+* description
+* 
+* @author Moritz Tenorth, tenorth@cs.tum.edu
+* @author Lars Kunze, kunzel@cs.tum.edu
+* @author Ralf Kaestner, ralf.kaestner@gmail.com
+*
+*/
 
 public class SemanticMapToOWL  extends AbstractNodeMain {
+  ConnectedNode node;
 
-	ConnectedNode node;
+  @Override
+  public GraphName getDefaultNodeName() {
+    return GraphName.of("semantic_map_to_owl");
+  }
 
-	@Override
-	public GraphName getDefaultNodeName() {
-		return GraphName.of("semantic_map_to_owl");
-	}
+  @Override
+  public void onStart(ConnectedNode connectedNode) {
+    this.node = connectedNode;
+    connectedNode.newServiceServer(
+      "knowrob_semantic_map_to_owl/generate_owl_map", 
+      knowrob_semantic_map_msgs.GenerateSemanticMapOWL._TYPE,
+      new ConvertToOwlCallback());
+  }
 
-	@Override
-	public void onStart(ConnectedNode connectedNode) {
+  class ConvertToOwlCallback implements ServiceResponseBuilder<
+      knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest,
+      knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse> {
+    @Override
+    public void build(knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest
+        req, knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse res) {
+      res.setOwlmap("");
 
-		this.node = connectedNode;
-		connectedNode.newServiceServer("knowrob_semantic_map_to_owl/generate_owl_map", 
-				knowrob_semantic_map_msgs.GenerateSemanticMapOWL._TYPE,
-				new ConvertToOwlCallback());
-	}
+      if (req.getMap() != null && req.getMap().getObjects().size()>0) {
+        OWLImportExport export = new OWLImportExport();
 
+        // use IAS_MAP as default, PREFIX_MANAGER is set by default
+        String namespace = OWLImportExport.IAS_MAP;
+        // get imports from message
+        List<String> imports = req.getMap().getImports();
 
-	/**
-	 * 
-	 * Callback class for querying the Web for the object type of a barcode
-	 * 
-	 * @author Moritz Tenorth, tenorth@cs.tum.edu
-	 *
-	 */
-	class ConvertToOwlCallback implements ServiceResponseBuilder<knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest, knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse> {
+        // get address from message
+        ArrayList<String[]> address = new ArrayList<String[]>();
 
-		@Override
-		public void build(knowrob_semantic_map_msgs.GenerateSemanticMapOWLRequest req, knowrob_semantic_map_msgs.GenerateSemanticMapOWLResponse res) {
+        if(!req.getMap().getAddress().getRoomNr().isEmpty())
+          address.add(new String[]{"knowrob:RoomInAConstruction",
+            "knowrob:roomNumber", req.getMap().getAddress().getRoomNr()});
 
-			res.setOwlmap("");
+        if(!req.getMap().getAddress().getFloorNr().isEmpty())
+          address.add(new String[]{"knowrob:LevelOfAConstruction",
+            "knowrob:floorNumber", req.getMap().getAddress().getFloorNr()});
 
-			if (req.getMap() != null && req.getMap().getObjects().size()>0) {
+        if(!req.getMap().getAddress().getStreetNr().isEmpty())
+          address.add(new String[]{"knowrob:Building",
+            "knowrob:streetNumber", req.getMap().getAddress().getStreetNr()});
 
-				OWLImportExport export = new OWLImportExport();
+        if(!req.getMap().getAddress().getStreetName().isEmpty())
+          address.add(new String[]{"knowrob:Street", "rdfs:label",
+            req.getMap().getAddress().getStreetName()});
 
-				// get address from ROS parameters
-				ArrayList<String[]> address = new ArrayList<String[]>();
-				String namespace = OWLImportExport.IAS_MAP; // use IAS_MAP as default, PREFIX_MANAGER is set by default
+        if(!req.getMap().getAddress().getCityName().isEmpty())
+          address.add(new String[]{"knowrob:City", "rdfs:label",
+            req.getMap().getAddress().getCityName()});
 
-				ParameterTree params = node.getParameterTree();
+        if(!req.getMap().getNamespace().isEmpty()) {
+          namespace = req.getMap().getNamespace();
 
-				if(params.has("map_address_room_nr") && params.getString("map_address_room_nr")!=null)
-					address.add(new String[]{"knowrob:RoomInAConstruction", "knowrob:roomNumber", params.getString("map_address_room_nr")});
+          if(!namespace.endsWith("#"))
+            namespace += "#";
+        }
 
-				if(params.has("map_address_floor_nr") && params.getString("map_address_floor_nr")!=null)
-					address.add(new String[]{"knowrob:LevelOfAConstruction", "knowrob:floorNumber", params.getString("map_address_floor_nr")});
+        System.err.println("Using map namespace: " + namespace);
 
-				if(params.has("map_address_street_nr") && params.getString("map_address_street_nr")!=null)
-					address.add(new String[]{"knowrob:Building", "knowrob:streetNumber", params.getString("map_address_street_nr")});
+        HashMap<String, ObjectInstance> mos = semMapObj2MapObj(namespace,
+          req.getMap().getObjects());
+          
+        OWLOntology owlmap = export.createOWLMapDescription(namespace, 
+          "SemanticEnvironmentMap" + new SimpleDateFormat(
+          "yyyyMMddHHmmss").format(Calendar.getInstance().getTime()), 
+          new ArrayList<ObjectInstance>(mos.values()), address);
+          
+        OWLOntologyManager manager = owlmap.getOWLOntologyManager();
+        PackageIRIMapper im = new PackageIRIMapper();
+        manager.addIRIMapper(im);
+        OWLDataFactory factory = manager.getOWLDataFactory();
+        PrefixManager pm = OWLImportExport.PREFIX_MANAGER;
+        
+        if(!imports.isEmpty()) {
+          for(String imp : imports) {
+            OWLImportsDeclaration oid = factory.getOWLImportsDeclaration(
+              IRI.create(imp));
+            AddImport addImp = new AddImport(owlmap,oid);
+          }
+        }
+        
+        Set<OWLImportsDeclaration> imps = owlmap.getImportsDeclarations();
+        for(OWLImportsDeclaration imp: imps) {
+          try {
+            manager.makeLoadImportRequest(imp);
+          }
+          catch(UnloadableImportException e) {
+            System.out.println(e.getMessage());
+          }
+        }
+        
+        for(SemMapObjectProperty smop : req.getMap().getObjectProperties()) {
+          ObjectInstance subj = mos.get(smop.getSubject());
+          ObjectInstance obj = mos.get(smop.getObject());
+            
+          if((subj != null) && (obj != null)) {
+            OWLObjectProperty op = null;
+            OWLNamedIndividual subjInd = null;
+            OWLNamedIndividual objInd = null;
+            
+            IRI opIRI = IRI.create(smop.getId());
+            if(pm.getPrefix(opIRI.getNamespace()) != null) {
+              op = factory.getOWLObjectProperty(smop.getId(), pm);
+            }
+            else {
+              op = factory.getOWLObjectProperty(opIRI);
+            }
+            
+            IRI subjIRI = IRI.create(namespace + smop.getSubject());
+            if(pm.getPrefix(subjIRI.getNamespace()) != null) {
+              subjInd = factory.getOWLNamedIndividual(smop.getSubject(), pm);
+            }
+            else {
+              subjInd = factory.getOWLNamedIndividual(subjIRI);
+            }
+            
+            IRI objIRI = IRI.create(namespace + smop.getObject());
+            if(pm.getPrefix(objIRI.getNamespace()) != null) {
+              objInd = factory.getOWLNamedIndividual(smop.getObject(), pm);
+            }
+            else {
+              objInd = factory.getOWLNamedIndividual(objIRI);
+            }
+            
+            OWLObjectPropertyAssertionAxiom opAxiom =
+              factory.getOWLObjectPropertyAssertionAxiom(op, subjInd, objInd);
+            manager.addAxiom(owlmap, opAxiom);
+          }
+        }
+                    
+        for(SemMapDataProperty smdp : req.getMap().getDataProperties()) {
+          ObjectInstance subj = mos.get(smdp.getSubject());
+            
+          if(subj != null) {
+            OWLDataProperty dp = null;
+            OWLNamedIndividual subjInd = null;
+            
+            IRI dpIRI = IRI.create(smdp.getId());
+            if(pm.getPrefix(dpIRI.getNamespace()) != null) {
+              dp = factory.getOWLDataProperty(smdp.getId(), pm);
+            }
+            else {
+              dp = factory.getOWLDataProperty(dpIRI);
+            }
+            
+            IRI subjIRI = IRI.create(namespace + smdp.getSubject());
+            if(pm.getPrefix(subjIRI.getNamespace()) != null) {
+              subjInd = factory.getOWLNamedIndividual(smdp.getSubject(), pm);
+            }
+            else {
+              subjInd = factory.getOWLNamedIndividual(subjIRI);
+            }
+            
+            OWLDataPropertyAssertionAxiom dpAxiom = null;
+            if(smdp.getValueType() == smdp.VALUE_TYPE_BOOL) {
+              dpAxiom = factory.getOWLDataPropertyAssertionAxiom(dp,
+                subjInd, Boolean.parseBoolean(smdp.getValue()));
+            }
+            else if(smdp.getValueType() == smdp.VALUE_TYPE_FLOAT) {
+              dpAxiom = factory.getOWLDataPropertyAssertionAxiom(dp,
+                subjInd, Integer.parseInt(smdp.getValue()));
+            }
+            else if(smdp.getValueType() == smdp.VALUE_TYPE_INT) {
+              dpAxiom = factory.getOWLDataPropertyAssertionAxiom(dp,
+                subjInd, Double.parseDouble(smdp.getValue()));
+            }
+            else {
+              dpAxiom = factory.getOWLDataPropertyAssertionAxiom(dp,
+                subjInd, smdp.getValue());
+            }
+            
+            manager.addAxiom(owlmap, dpAxiom);
+          }
+        }
+                            
+        res.setOwlmap(OWLFileUtils.saveOntologytoString(owlmap,
+          owlmap.getOWLOntologyManager().getOntologyFormat(owlmap)));
+      }
+    }
+  }
 
-				if(params.has("map_address_street_name") && params.getString("map_address_street_name")!=null)
-					address.add(new String[]{"knowrob:Street", "rdfs:label", params.getString("map_address_street_name")});
+  private HashMap<String, ObjectInstance> semMapObj2MapObj(String map_id,
+      List<SemMapObject> smos) {
+    HashMap<String, ObjectInstance> mos = new
+      HashMap<String, ObjectInstance>();
 
-				if(params.has("map_address_city_name") && params.getString("map_address_city_name")!=null)
-					address.add(new String[]{"knowrob:City", "rdfs:label", params.getString("map_address_city_name")});
+    for(SemMapObject smo : smos) {
+      ObjectInstance mo = ObjectInstance.getObjectInstance(smo.getId());
+      mos.put(smo.getId(), mo);
 
+      mo.addType(OWLClass.getOWLClass(smo.getType()));
 
-				if (params.has("map_owl_namespace") && params.getString("map_owl_namespace")!=null) {
-					namespace = params.getString("map_owl_namespace");
+      mo.getDimensions().x=smo.getSize().getX();
+      mo.getDimensions().y=smo.getSize().getY();
+      mo.getDimensions().z=smo.getSize().getZ();
 
-					if(!namespace.endsWith("#"))
-						namespace += "#";
-				}
+      Vector3d position = new Vector3d();
+      position.x = smo.getPose().getPosition().getX();
+      position.y = smo.getPose().getPosition().getY();
+      position.z = smo.getPose().getPosition().getZ();
 
-				System.err.println("Using map id: " + namespace);
+      Quat4d orientation = new Quat4d();
+      orientation.x = smo.getPose().getOrientation().getX();
+      orientation.y = smo.getPose().getOrientation().getY();
+      orientation.z = smo.getPose().getOrientation().getZ();
+      orientation.w = smo.getPose().getOrientation().getW();
+      
+      mo.setPoseQuaternion(position, orientation, 1.0);
+      
+      if(mos.get(smo.getPartOf()) != null)
+        mos.get(smo.getPartOf()).addPhysicalPart(mo);
+    }
 
-
-				OWLOntology owlmap = export.createOWLMapDescription(namespace, 
-						"SemanticEnvironmentMap" + new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime()), 
-						semMapObj2MapObj(namespace, req.getMap().getObjects()), address);
-				res.setOwlmap(OWLFileUtils.saveOntologytoString(owlmap, owlmap.getOWLOntologyManager().getOntologyFormat(owlmap)));
-
-			}
-		}
-	}
-
-
-	private ArrayList<ObjectInstance> semMapObj2MapObj(String map_id, List<SemMapObject> smos) {
-
-		HashMap<Integer, ObjectInstance> intIdToID = new HashMap<Integer, ObjectInstance>();
-		ArrayList<ObjectInstance> mos = new ArrayList<ObjectInstance>();
-
-		for(SemMapObject smo : smos) {
-
-			ObjectInstance mo = ObjectInstance.getObjectInstance(smo.getType() + smo.getId());
-			intIdToID.put(smo.getId(), mo);
-
-			mo.addType(OWLClass.getOWLClass(smo.getType()));
-
-			mo.getDimensions().x=smo.getWidth();
-			mo.getDimensions().y=smo.getDepth();
-			mo.getDimensions().z=smo.getHeight();
-
-			for(int i=0;i<4;i++) {
-				for(int j=0;j<4;j++) {
-					mo.getPoseMatrix().setElement(i, j, smo.getPose()[4*i+j]);
-				}
-			}
-
-			if(intIdToID.get(smo.getPartOf()) != null)
-				intIdToID.get(smo.getPartOf()).addPhysicalPart(mo);
-
-			mos.add(mo);
-		}
-
-		return mos;
-	}
+    return mos;
+  }
 }

@@ -23,6 +23,6 @@ install(DIRECTORY ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_MAVEN_DESTINATION}/
 
 install(PROGRAMS knowrob_semantic_map_to_owl/build/scripts/knowrob_semantic_map_to_owl
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/scripts)
-install(PROGRAMS scripts/semantic_map_to_owl_node
-                 scripts/semantic_map_to_owl_test_client
+install(PROGRAMS bin/semantic_map_to_owl_node
+                 bin/semantic_map_to_owl_test_client
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/bin)
