@@ -18,18 +18,18 @@ import org.ros.node.parameter.ParameterTree;
 import org.ros.node.service.ServiceResponseBuilder;
 
 import org.semanticweb.owlapi.apibinding.OWLManager;
-import org.semanticweb.owlapi.io.RDFXMLOntologyFormat;
 import org.semanticweb.owlapi.model.*;
+import org.semanticweb.owlapi.util.DefaultPrefixManager;
+import org.semanticweb.owlapi.vocab.PrefixOWLOntologyFormat;
 
 import org.knowrob.owl.OWLClass;
 import org.knowrob.owl.ObjectInstance;
 import org.knowrob.owl.utils.OWLFileUtils;
-import org.knowrob.owl.utils.OWLImportExport;
 import org.knowrob.owl.utils.PackageIRIMapper;
 
-import knowrob_semantic_map_msgs.SemMapDataProperty;
-import knowrob_semantic_map_msgs.SemMapObject;
-import knowrob_semantic_map_msgs.SemMapObjectProperty;
+import knowrob_semantic_map_msgs.*;
+
+import org.knowrob.map.SemanticMapToOWLExport;
 
 /**
 * ROS service to convert a mod_semantic_map/SemMap message into an OWL
@@ -41,7 +41,7 @@ import knowrob_semantic_map_msgs.SemMapObjectProperty;
 *
 */
 
-public class SemanticMapToOWL  extends AbstractNodeMain {
+public class SemanticMapToOWL extends AbstractNodeMain {
   ConnectedNode node;
 
   @Override
@@ -67,48 +67,48 @@ public class SemanticMapToOWL  extends AbstractNodeMain {
       res.setOwlmap("");
 
       if (req.getMap() != null && req.getMap().getObjects().size()>0) {
-        OWLImportExport export = new OWLImportExport();
-
-        // use IAS_MAP as default, PREFIX_MANAGER is set by default
-        String namespace = OWLImportExport.IAS_MAP;
-        // get imports from message
-        List<String> imports = req.getMap().getImports();
+        SemanticMapToOWLExport export = new SemanticMapToOWLExport();
 
         // get address from message
         ArrayList<String[]> address = new ArrayList<String[]>();
-
         if(!req.getMap().getAddress().getRoomNr().isEmpty())
           address.add(new String[]{"knowrob:RoomInAConstruction",
             "knowrob:roomNumber", req.getMap().getAddress().getRoomNr()});
-
         if(!req.getMap().getAddress().getFloorNr().isEmpty())
           address.add(new String[]{"knowrob:LevelOfAConstruction",
             "knowrob:floorNumber", req.getMap().getAddress().getFloorNr()});
-
         if(!req.getMap().getAddress().getStreetNr().isEmpty())
           address.add(new String[]{"knowrob:Building",
             "knowrob:streetNumber", req.getMap().getAddress().getStreetNr()});
-
         if(!req.getMap().getAddress().getStreetName().isEmpty())
           address.add(new String[]{"knowrob:Street", "rdfs:label",
             req.getMap().getAddress().getStreetName()});
-
         if(!req.getMap().getAddress().getCityName().isEmpty())
           address.add(new String[]{"knowrob:City", "rdfs:label",
             req.getMap().getAddress().getCityName()});
-
+            
+        // use IAS_MAP as default, PREFIX_MANAGER is set by default
+        String namespace = SemanticMapToOWLExport.IAS_MAP;
         if(!req.getMap().getNamespace().isEmpty()) {
           namespace = req.getMap().getNamespace();
 
           if(!namespace.endsWith("#"))
             namespace += "#";
         }
-
-        System.err.println("Using map namespace: " + namespace);
-
+        System.err.println("Using map namespace: " + namespace);        
+        
+        DefaultPrefixManager pm = SemanticMapToOWLExport.PREFIX_MANAGER;
+        for(SemMapPrefix pref : req.getMap().getPrefixes()) {
+          if(pref.getName().endsWith(":")) {
+            pm.setPrefix(pref.getName(), pref.getPrefix());
+          }
+          else {
+            pm.setPrefix(pref.getName()+":", pref.getPrefix());
+          }
+        }
+        
         HashMap<String, ObjectInstance> mos = semMapObj2MapObj(namespace,
           req.getMap().getObjects());
-          
         OWLOntology owlmap = export.createOWLMapDescription(namespace, 
           "SemanticEnvironmentMap" + new SimpleDateFormat(
           "yyyyMMddHHmmss").format(Calendar.getInstance().getTime()), 
@@ -118,14 +118,23 @@ public class SemanticMapToOWL  extends AbstractNodeMain {
         PackageIRIMapper im = new PackageIRIMapper();
         manager.addIRIMapper(im);
         OWLDataFactory factory = manager.getOWLDataFactory();
-        PrefixManager pm = OWLImportExport.PREFIX_MANAGER;
-        
-        if(!imports.isEmpty()) {
-          for(String imp : imports) {
-            OWLImportsDeclaration oid = factory.getOWLImportsDeclaration(
-              IRI.create(imp));
-            AddImport addImp = new AddImport(owlmap,oid);
+        PrefixOWLOntologyFormat pf = (PrefixOWLOntologyFormat)
+          manager.getOntologyFormat(owlmap);
+
+        for(SemMapPrefix pref : req.getMap().getPrefixes()) {
+          if(pref.getName().endsWith(":")) {
+            pf.setPrefix(pref.getName(), pref.getPrefix());
           }
+          else {
+            pf.setPrefix(pref.getName()+":", pref.getPrefix());
+          }
+        }
+          
+        for(String imp : req.getMap().getImports()) {
+          OWLImportsDeclaration oid = factory.getOWLImportsDeclaration(
+            IRI.create(imp));
+          AddImport addImp = new AddImport(owlmap,oid);
+          manager.applyChange(addImp);
         }
         
         Set<OWLImportsDeclaration> imps = owlmap.getImportsDeclarations();
