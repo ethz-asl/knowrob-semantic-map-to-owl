@@ -1,3 +1,9 @@
+knowrob-semantic-map-to-owl (1.0.1-5) unstable; urgency=low
+
+  * Fixed float/int conversion
+
+ -- Ralf Kaestner <ralf.kaestner@gmail.com>  Sun, 29 Mar 2015 16:04:00 +0100
+
 knowrob-semantic-map-to-owl (1.0.1-4) unstable; urgency=low
 
   * Map prefixes may now be passed without the trailing colon

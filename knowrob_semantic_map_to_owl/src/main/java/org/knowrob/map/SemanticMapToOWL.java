@@ -216,11 +216,11 @@ public class SemanticMapToOWL extends AbstractNodeMain {
             }
             else if(smdp.getValueType() == smdp.VALUE_TYPE_FLOAT) {
               dpAxiom = factory.getOWLDataPropertyAssertionAxiom(dp,
-                subjInd, Integer.parseInt(smdp.getValue()));
+                subjInd, Double.parseDouble(smdp.getValue()));
             }
             else if(smdp.getValueType() == smdp.VALUE_TYPE_INT) {
               dpAxiom = factory.getOWLDataPropertyAssertionAxiom(dp,
-                subjInd, Double.parseDouble(smdp.getValue()));
+                subjInd, Integer.parseInt(smdp.getValue()));
             }
             else {
               dpAxiom = factory.getOWLDataPropertyAssertionAxiom(dp,
