@@ -52,8 +52,7 @@ public class SemanticMapToOWL extends AbstractNodeMain {
   @Override
   public void onStart(ConnectedNode connectedNode) {
     this.node = connectedNode;
-    connectedNode.newServiceServer(
-      "knowrob_semantic_map_to_owl/generate_owl_map", 
+    connectedNode.newServiceServer("~generate_owl_map", 
       knowrob_semantic_map_msgs.GenerateSemanticMapOWL._TYPE,
       new ConvertToOwlCallback());
   }
@@ -95,7 +94,13 @@ public class SemanticMapToOWL extends AbstractNodeMain {
           if(!namespace.endsWith("#"))
             namespace += "#";
         }
-        System.err.println("Using map namespace: " + namespace);        
+        System.err.println("Using map namespace: " + namespace);
+        
+        String id = req.getMap().getId();
+        if(id.isEmpty()) {
+          id = "SemanticEnvironmentMap" + new SimpleDateFormat(
+          "yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
+        }
         
         DefaultPrefixManager pm = SemanticMapToOWLExport.PREFIX_MANAGER;
         for(SemMapPrefix pref : req.getMap().getPrefixes()) {
@@ -109,11 +114,9 @@ public class SemanticMapToOWL extends AbstractNodeMain {
         
         HashMap<String, ObjectInstance> mos = semMapObj2MapObj(namespace,
           req.getMap().getObjects());
-        OWLOntology owlmap = export.createOWLMapDescription(namespace, 
-          "SemanticEnvironmentMap" + new SimpleDateFormat(
-          "yyyyMMddHHmmss").format(Calendar.getInstance().getTime()), 
+        OWLOntology owlmap = export.createOWLMapDescription(namespace, id, 
           new ArrayList<ObjectInstance>(mos.values()), address);
-          
+        
         OWLOntologyManager manager = owlmap.getOWLOntologyManager();
         PackageIRIMapper im = new PackageIRIMapper();
         manager.addIRIMapper(im);

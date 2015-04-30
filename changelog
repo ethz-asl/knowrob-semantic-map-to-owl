@@ -1,3 +1,10 @@
+knowrob-semantic-map-to-owl (1.0.1-6) unstable; urgency=low
+
+  * Added parameter passing to startup scripts
+  * Semantic map is now created using the id passed in the service call
+
+ -- Ralf Kaestner <ralf.kaestner@gmail.com>  Thu, 30 Apr 2015 09:26:00 +0100
+
 knowrob-semantic-map-to-owl (1.0.1-5) unstable; urgency=low
 
   * Fixed float/int conversion
