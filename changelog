@@ -1,3 +1,9 @@
+knowrob-semantic-map-to-owl (1.0.1-7) unstable; urgency=low
+
+  * Added frame id and timestamp handling
+
+ -- Ralf Kaestner <ralf.kaestner@gmail.com>  Mon, 04 May 2015 13:52:00 +0100
+
 knowrob-semantic-map-to-owl (1.0.1-6) unstable; urgency=low
 
   * Added parameter passing to startup scripts

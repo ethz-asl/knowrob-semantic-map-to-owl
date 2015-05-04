@@ -6,6 +6,7 @@ import org.semanticweb.owlapi.util.DefaultPrefixManager;
 
 import org.knowrob.owl.JointInstance;
 import org.knowrob.owl.ObjectInstance;
+import org.knowrob.owl.OWLThing;
 
 import org.knowrob.owl.utils.OWLImportExport;
 
@@ -18,7 +19,50 @@ import org.knowrob.owl.utils.OWLImportExport;
 */
 
 public class SemanticMapToOWLExport extends OWLImportExport {
+  public final static String MAP_FRAME = "map";
+  
+  /**
+  * Map frame
+  */
+  protected String mapFrame;
+  
   public SemanticMapToOWLExport() {
+    this.mapFrame = MAP_FRAME;
+  }
+  
+  /**
+  * Get map frame.
+  *
+  * @return
+  */
+  public String getMapFrame() {
+    return mapFrame;
+  }
+
+  /**
+  * Set map frame.
+  * 
+  * @param frame
+  */
+  public void setMapFrame(String mapFrame) {
+    this.mapFrame = mapFrame;
+  }
+  
+  @Override
+  public OWLNamedIndividual createSemMapInst(String namespace, String map_id,
+      OWLOntology ontology) {
+    OWLOntologyManager manager = ontology.getOWLOntologyManager();
+    OWLDataFactory factory = manager.getOWLDataFactory();
+    DefaultPrefixManager pm = PREFIX_MANAGER;
+    
+    OWLNamedIndividual sem_map_inst = super.createSemMapInst(namespace,
+      map_id, ontology);
+
+    OWLDataProperty prop = factory.getOWLDataProperty("knowrob:tfFrame", pm);
+    manager.addAxiom(ontology, factory.getOWLDataPropertyAssertionAxiom(
+      prop,  sem_map_inst, this.mapFrame));
+    
+    return sem_map_inst;
   }
   
   @Override
@@ -46,6 +90,18 @@ public class SemanticMapToOWLExport extends OWLImportExport {
     
       manager.addAxiom(ontology, factory.getOWLClassAssertionAxiom(objClass,
         objInstance)); 
+    }
+    
+    // write tf frame data property
+    if(mapObject instanceof SemanticMapObject) {
+      SemanticMapObject smapObject = (SemanticMapObject) mapObject;
+      
+      if(!smapObject.getFrame().isEmpty()) {
+        OWLDataProperty property = factory.getOWLDataProperty(
+          "knowrob:tfFrame",  pm);
+        manager.addAxiom(ontology, factory.getOWLDataPropertyAssertionAxiom(
+          property, objInstance, smapObject.getFrame()));        
+      }
     }
     
     // write all normal data properties contained in the properties hashmap 
@@ -80,5 +136,19 @@ public class SemanticMapToOWLExport extends OWLImportExport {
     }
     
     return objInstance;
+  }
+  
+  @Override
+  public OWLNamedIndividual createSemObjectInstanceDescription(ObjectInstance
+      map_obj, OWLNamedIndividual timestamp, OWLOntology ontology) {
+    // create time instance
+    OWLNamedIndividual time_inst = timestamp;
+    if(map_obj instanceof SemanticMapObject) {
+      SemanticMapObject smap_obj = (SemanticMapObject) map_obj;
+      time_inst = createTimePointInst(smap_obj.getStamp(), ontology);
+    }
+    
+    return super.createSemObjectInstanceDescription(map_obj, time_inst,
+      ontology);
   }
 }

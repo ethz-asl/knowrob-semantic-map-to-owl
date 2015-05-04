@@ -3,7 +3,7 @@ package org.knowrob.map;
 import java.text.SimpleDateFormat;
 
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -29,6 +29,7 @@ import org.knowrob.owl.utils.PackageIRIMapper;
 
 import knowrob_semantic_map_msgs.*;
 
+import org.knowrob.map.SemanticMapObject;
 import org.knowrob.map.SemanticMapToOWLExport;
 
 /**
@@ -67,6 +68,7 @@ public class SemanticMapToOWL extends AbstractNodeMain {
 
       if (req.getMap() != null && req.getMap().getObjects().size()>0) {
         SemanticMapToOWLExport export = new SemanticMapToOWLExport();
+        export.setMapFrame(req.getMap().getHeader().getFrameId());
 
         // get address from message
         ArrayList<String[]> address = new ArrayList<String[]>();
@@ -96,11 +98,15 @@ public class SemanticMapToOWL extends AbstractNodeMain {
         }
         System.err.println("Using map namespace: " + namespace);
         
-        String id = req.getMap().getId();
+        String id = req.getMap().getId();        
         if(id.isEmpty()) {
-          id = "SemanticEnvironmentMap" + new SimpleDateFormat(
-          "yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
+          id = "SemanticEnvironmentMap";
         }
+          
+        Date date = new Date();
+        date.setTime(Math.round(
+          req.getMap().getHeader().getStamp().toSeconds()*1e3));
+        id += new SimpleDateFormat("yyyyMMddHHmmss").format(date);
         
         DefaultPrefixManager pm = SemanticMapToOWLExport.PREFIX_MANAGER;
         for(SemMapPrefix pref : req.getMap().getPrefixes()) {
@@ -233,7 +239,7 @@ public class SemanticMapToOWL extends AbstractNodeMain {
             manager.addAxiom(owlmap, dpAxiom);
           }
         }
-                            
+         
         res.setOwlmap(OWLFileUtils.saveOntologytoString(owlmap,
           owlmap.getOWLOntologyManager().getOntologyFormat(owlmap)));
       }
@@ -246,11 +252,15 @@ public class SemanticMapToOWL extends AbstractNodeMain {
       HashMap<String, ObjectInstance>();
 
     for(SemMapObject smo : smos) {
-      ObjectInstance mo = ObjectInstance.getObjectInstance(smo.getId());
+      SemanticMapObject mo = SemanticMapObject.getSemanticMapObject(
+        smo.getId());
       mos.put(smo.getId(), mo);
 
       mo.addType(OWLClass.getOWLClass(smo.getType()));
 
+      mo.setStamp(Math.round(smo.getHeader().getStamp().toSeconds()));
+      mo.setFrame(smo.getHeader().getFrameId());
+      
       mo.getDimensions().x=smo.getSize().getX();
       mo.getDimensions().y=smo.getSize().getY();
       mo.getDimensions().z=smo.getSize().getZ();
