@@ -1,3 +1,9 @@
+knowrob-semantic-map-to-owl (1.0.1-8) unstable; urgency=low
+
+  * Server now handles semantic map actions
+
+ -- Ralf Kaestner <ralf.kaestner@gmail.com>  Tue, 12 May 2015 11:09:00 +0100
+
 knowrob-semantic-map-to-owl (1.0.1-7) unstable; urgency=low
 
   * Added frame id and timestamp handling

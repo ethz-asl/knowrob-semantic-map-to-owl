@@ -1,5 +1,7 @@
 package org.knowrob.map;
 
+import java.util.ArrayList;
+
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
 import org.semanticweb.owlapi.util.DefaultPrefixManager;
@@ -47,6 +49,93 @@ public class SemanticMapToOWLExport extends OWLImportExport {
   public void setMapFrame(String mapFrame) {
     this.mapFrame = mapFrame;
   }
+
+  public OWLOntology createOWLMapWithActionDescription(
+      String namespace, String map_id, ArrayList<ObjectInstance> objects,
+      ArrayList<SemanticMapAction> actions) {
+    return this.createOWLMapWithActionDescription(namespace, map_id,
+      objects, actions, null);
+  }
+  
+  public OWLOntology createOWLMapWithActionDescription(
+      String namespace, String map_id, ArrayList<ObjectInstance> objects,
+      ArrayList<SemanticMapAction> actions, ArrayList<String[]> address) {
+    OWLOntology ontology = this.createOWLMapDescription(namespace, map_id,
+      objects, address);
+
+    if(ontology != null) {
+      try {
+        OWLOntologyManager manager = ontology.getOWLOntologyManager();
+        OWLDataFactory factory = manager.getOWLDataFactory();
+        DefaultPrefixManager pm = PREFIX_MANAGER;
+        
+        for(SemanticMapAction map_act : actions) {
+          createActionClass(map_act, ontology);
+        }
+      } catch (Exception e) {
+        ontology = null;
+        e.printStackTrace();
+      }
+    }
+    
+    return ontology;
+  }
+  
+  public OWLClass createActionClass(SemanticMapAction mapAction,
+      OWLOntology ontology) {
+    OWLOntologyManager manager = ontology.getOWLOntologyManager();
+    OWLDataFactory factory = manager.getOWLDataFactory();
+    DefaultPrefixManager pm = PREFIX_MANAGER;
+    
+    OWLClass actClass = factory.getOWLClass(
+      "map:"+mapAction.getShortName(), pm);
+    manager.addAxiom(ontology, factory.getOWLDeclarationAxiom(actClass));
+    OWLClass actSuperClass = null;
+    
+    for(org.knowrob.owl.OWLClass s : mapAction.getSuperClasses()) {
+      IRI classIRI = IRI.create(s.getIRI());
+      if(pm.getPrefix(classIRI.getNamespace()) != null) {
+        actSuperClass = factory.getOWLClass(s.getIRI(), pm);
+      }
+      else if(!classIRI.isAbsolute()) {
+        actSuperClass = factory.getOWLClass("knowrob:"+s.getShortName(), pm);
+      }
+      else {
+        actSuperClass = factory.getOWLClass(classIRI);
+      }
+    
+      manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(actClass,
+        actSuperClass)); 
+    }
+
+    OWLObjectProperty objectActedOnProp = factory.getOWLObjectProperty(
+      "knowrob:objectActedOn", pm);
+    SemanticMapObject o = mapAction.getObjectActedOn();
+    
+    if(o != null) {
+      IRI objIRI = IRI.create(o.getIRI());
+      OWLNamedIndividual objectActedOn = null;
+
+      if(pm.getPrefix(objIRI.getNamespace()) != null) {
+        objectActedOn = factory.getOWLNamedIndividual(
+          o.getIRI(), pm);
+      }
+      else if(!objIRI.isAbsolute()) {
+        objectActedOn = factory.getOWLNamedIndividual(
+          "map:"+o.getShortName(), pm);
+      }
+      else {
+        objectActedOn = factory.getOWLNamedIndividual(objIRI);
+      }
+    
+      OWLClassExpression objectActedOnHasValue = factory.getOWLObjectHasValue(
+        objectActedOnProp, objectActedOn);
+      manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(actClass,
+        objectActedOnHasValue));
+    }
+    
+    return actClass;
+  }
   
   @Override
   public OWLNamedIndividual createSemMapInst(String namespace, String map_id,
@@ -60,7 +149,7 @@ public class SemanticMapToOWLExport extends OWLImportExport {
 
     OWLDataProperty prop = factory.getOWLDataProperty("knowrob:tfFrame", pm);
     manager.addAxiom(ontology, factory.getOWLDataPropertyAssertionAxiom(
-      prop,  sem_map_inst, this.mapFrame));
+      prop, sem_map_inst, this.mapFrame));
     
     return sem_map_inst;
   }

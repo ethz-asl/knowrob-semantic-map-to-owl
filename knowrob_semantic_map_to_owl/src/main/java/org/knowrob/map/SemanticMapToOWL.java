@@ -23,12 +23,14 @@ import org.semanticweb.owlapi.util.DefaultPrefixManager;
 import org.semanticweb.owlapi.vocab.PrefixOWLOntologyFormat;
 
 import org.knowrob.owl.OWLClass;
+import org.knowrob.owl.OWLThing;
 import org.knowrob.owl.ObjectInstance;
 import org.knowrob.owl.utils.OWLFileUtils;
 import org.knowrob.owl.utils.PackageIRIMapper;
 
 import knowrob_semantic_map_msgs.*;
 
+import org.knowrob.map.SemanticMapAction;
 import org.knowrob.map.SemanticMapObject;
 import org.knowrob.map.SemanticMapToOWLExport;
 
@@ -120,8 +122,11 @@ public class SemanticMapToOWL extends AbstractNodeMain {
         
         HashMap<String, ObjectInstance> mos = semMapObj2MapObj(namespace,
           req.getMap().getObjects());
-        OWLOntology owlmap = export.createOWLMapDescription(namespace, id, 
-          new ArrayList<ObjectInstance>(mos.values()), address);
+        HashMap<String, SemanticMapAction> mas = semMapAct2MapAct(namespace,
+          req.getMap().getActions());
+        OWLOntology owlmap = export.createOWLMapWithActionDescription(
+          namespace, id,  new ArrayList<ObjectInstance>(mos.values()),
+          new ArrayList<SemanticMapAction>(mas.values()), address);
         
         OWLOntologyManager manager = owlmap.getOWLOntologyManager();
         PackageIRIMapper im = new PackageIRIMapper();
@@ -157,10 +162,10 @@ public class SemanticMapToOWL extends AbstractNodeMain {
         }
         
         for(SemMapObjectProperty smop : req.getMap().getObjectProperties()) {
-          ObjectInstance subj = mos.get(smop.getSubject());
-          ObjectInstance obj = mos.get(smop.getObject());
-            
-          if((subj != null) && (obj != null)) {
+          if((mos.get(smop.getSubject()) != null) &&
+              (mos.get(smop.getObject()) != null)) {
+            // object properties linked to map object individuals get
+            // instantiated as OWL object properties
             OWLObjectProperty op = null;
             OWLNamedIndividual subjInd = null;
             OWLNamedIndividual objInd = null;
@@ -193,12 +198,52 @@ public class SemanticMapToOWL extends AbstractNodeMain {
               factory.getOWLObjectPropertyAssertionAxiom(op, subjInd, objInd);
             manager.addAxiom(owlmap, opAxiom);
           }
+          else if(mas.get(smop.getSubject()) != null) {
+            // data properties linked to map action classes get instantiated
+            // as OWL restrictions on object properties
+            OWLObjectProperty op = null;
+            org.semanticweb.owlapi.model.OWLClass actClass = null;
+            OWLNamedIndividual objInd = null;
+            
+            IRI opIRI = IRI.create(smop.getId());
+            if(pm.getPrefix(opIRI.getNamespace()) != null) {
+              op = factory.getOWLObjectProperty(smop.getId(), pm);
+            }
+            else {
+              op = factory.getOWLObjectProperty(opIRI);
+            }
+            
+            IRI subjIRI = IRI.create(namespace + smop.getSubject());
+            if(pm.getPrefix(subjIRI.getNamespace()) != null) {
+              actClass = factory.getOWLClass(smop.getSubject(), pm);
+            }
+            else {
+              actClass = factory.getOWLClass(subjIRI);
+            }
+            
+            IRI objIRI = IRI.create(smop.getObject());
+            if(pm.getPrefix(objIRI.getNamespace()) != null) {
+              objInd = factory.getOWLNamedIndividual(smop.getObject(), pm);
+            }
+            else if(!objIRI.isAbsolute()) {
+              objInd = factory.getOWLNamedIndividual(
+                "map:"+OWLThing.getShortNameOfIRI(smop.getObject()), pm);
+            }
+            else {
+              objInd = factory.getOWLNamedIndividual(objIRI);
+            }
+            
+            OWLClassExpression opExpr = factory.getOWLObjectHasValue(
+              op, objInd);
+            manager.addAxiom(owlmap, factory.getOWLSubClassOfAxiom(
+              actClass, opExpr));            
+          }
         }
                     
         for(SemMapDataProperty smdp : req.getMap().getDataProperties()) {
-          ObjectInstance subj = mos.get(smdp.getSubject());
-            
-          if(subj != null) {
+          if(mos.get(smdp.getSubject()) != null) {
+            // data properties linked to map object individuals get
+            // instantiated as OWL data properties
             OWLDataProperty dp = null;
             OWLNamedIndividual subjInd = null;
             
@@ -237,6 +282,49 @@ public class SemanticMapToOWL extends AbstractNodeMain {
             }
             
             manager.addAxiom(owlmap, dpAxiom);
+          }
+          else if(mas.get(smdp.getSubject()) != null) {
+            // data properties linked to map action classes get instantiated
+            // as OWL restrictions on data properties
+            OWLDataProperty dp = null;
+            org.semanticweb.owlapi.model.OWLClass actClass = null;
+            
+            IRI dpIRI = IRI.create(smdp.getId());
+            if(pm.getPrefix(dpIRI.getNamespace()) != null) {
+              dp = factory.getOWLDataProperty(smdp.getId(), pm);
+            }
+            else {
+              dp = factory.getOWLDataProperty(dpIRI);
+            }
+            
+            IRI subjIRI = IRI.create(namespace + smdp.getSubject());
+            if(pm.getPrefix(subjIRI.getNamespace()) != null) {
+              actClass = factory.getOWLClass(smdp.getSubject(), pm);
+            }
+            else {
+              actClass = factory.getOWLClass(subjIRI);
+            }
+            
+            OWLClassExpression dpExpr = null;
+            if(smdp.getValueType() == smdp.VALUE_TYPE_BOOL) {
+              dpExpr = factory.getOWLDataHasValue(dp,
+                factory.getOWLLiteral(Boolean.parseBoolean(smdp.getValue())));
+            }
+            else if(smdp.getValueType() == smdp.VALUE_TYPE_FLOAT) {
+              dpExpr = factory.getOWLDataHasValue(dp,
+                factory.getOWLLiteral(Double.parseDouble(smdp.getValue())));
+            }
+            else if(smdp.getValueType() == smdp.VALUE_TYPE_INT) {
+              dpExpr = factory.getOWLDataHasValue(dp,
+                factory.getOWLLiteral(Integer.parseInt(smdp.getValue())));
+            }
+            else {
+              dpExpr = factory.getOWLDataHasValue(dp,
+                factory.getOWLLiteral(smdp.getValue()));
+            }
+            
+            manager.addAxiom(owlmap, factory.getOWLSubClassOfAxiom(
+              actClass, dpExpr));
           }
         }
          
@@ -283,5 +371,22 @@ public class SemanticMapToOWL extends AbstractNodeMain {
     }
 
     return mos;
+  }
+  
+  private HashMap<String, SemanticMapAction> semMapAct2MapAct(String map_id,
+      List<SemMapAction> smas) {
+    HashMap<String, SemanticMapAction> mas = new
+      HashMap<String, SemanticMapAction>();
+
+    for(SemMapAction sma : smas) {
+      SemanticMapAction ma = SemanticMapAction.getSemanticMapAction(
+        sma.getId());
+      mas.put(sma.getId(), ma);
+
+      ma.addSuperClass(OWLClass.getOWLClass(sma.getType()));
+      ma.setObjectActedOn(sma.getObjectActedOn());
+    }
+
+    return mas;
   }
 }
