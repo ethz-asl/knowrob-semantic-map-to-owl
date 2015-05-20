@@ -124,9 +124,13 @@ public class SemanticMapToOWL extends AbstractNodeMain {
           req.getMap().getObjects());
         HashMap<String, SemanticMapAction> mas = semMapAct2MapAct(namespace,
           req.getMap().getActions());
+        HashMap<String, SemanticMapTask> mts = semMapTask2MapTask(namespace,
+          req.getMap().getTasks());
+          
         OWLOntology owlmap = export.createOWLMapWithActionDescription(
           namespace, id,  new ArrayList<ObjectInstance>(mos.values()),
-          new ArrayList<SemanticMapAction>(mas.values()), address);
+          new ArrayList<SemanticMapAction>(mas.values()),
+          new ArrayList<SemanticMapTask>(mts.values()), address);
         
         OWLOntologyManager manager = owlmap.getOWLOntologyManager();
         PackageIRIMapper im = new PackageIRIMapper();
@@ -198,9 +202,10 @@ public class SemanticMapToOWL extends AbstractNodeMain {
               factory.getOWLObjectPropertyAssertionAxiom(op, subjInd, objInd);
             manager.addAxiom(owlmap, opAxiom);
           }
-          else if(mas.get(smop.getSubject()) != null) {
-            // data properties linked to map action classes get instantiated
-            // as OWL restrictions on object properties
+          else if((mas.get(smop.getSubject()) != null) ||
+              (mts.get(smop.getSubject()) != null)) {
+            // object properties linked to map action/task classes get
+            // instantiated as OWL restrictions on object properties
             OWLObjectProperty op = null;
             org.semanticweb.owlapi.model.OWLClass actClass = null;
             OWLNamedIndividual objInd = null;
@@ -283,9 +288,10 @@ public class SemanticMapToOWL extends AbstractNodeMain {
             
             manager.addAxiom(owlmap, dpAxiom);
           }
-          else if(mas.get(smdp.getSubject()) != null) {
-            // data properties linked to map action classes get instantiated
-            // as OWL restrictions on data properties
+          else if((mas.get(smdp.getSubject()) != null) ||
+              (mts.get(smdp.getSubject()) != null)) {
+            // data properties linked to map action/task classes get
+            // instantiated as OWL restrictions on data properties
             OWLDataProperty dp = null;
             org.semanticweb.owlapi.model.OWLClass actClass = null;
             
@@ -388,5 +394,33 @@ public class SemanticMapToOWL extends AbstractNodeMain {
     }
 
     return mas;
+  }
+  
+  private HashMap<String, SemanticMapTask> semMapTask2MapTask(String map_id,
+      List<SemMapTask> smts) {
+    HashMap<String, SemanticMapTask> mts = new
+      HashMap<String, SemanticMapTask>();
+
+    for(SemMapTask smt : smts) {
+      SemanticMapTask mt = SemanticMapTask.getSemanticMapTask(
+        smt.getId());
+      mts.put(smt.getId(), mt);
+
+      mt.addSuperClass(OWLClass.getOWLClass(smt.getType()));
+      
+      if(smt.getQuantification() == SemMapTask.UNION_OF) {
+        mt.setQuantification(SemanticMapTask.Quantification.UNION_OF);
+      }
+      else {
+        mt.setQuantification(SemanticMapTask.Quantification.INTERSECTION_OF);
+      }
+      mt.setOrdered(smt.getOrdered());
+      
+      for(String iri : smt.getActions()) {
+        mt.addAction(iri);
+      }
+    }
+
+    return mts;
   }
 }

@@ -1,6 +1,9 @@
 package org.knowrob.map;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Vector;
 
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.*;
@@ -52,14 +55,16 @@ public class SemanticMapToOWLExport extends OWLImportExport {
 
   public OWLOntology createOWLMapWithActionDescription(
       String namespace, String map_id, ArrayList<ObjectInstance> objects,
-      ArrayList<SemanticMapAction> actions) {
+      ArrayList<SemanticMapAction> actions, ArrayList<SemanticMapTask>
+      tasks) {
     return this.createOWLMapWithActionDescription(namespace, map_id,
-      objects, actions, null);
+      objects, actions, tasks, null);
   }
   
   public OWLOntology createOWLMapWithActionDescription(
       String namespace, String map_id, ArrayList<ObjectInstance> objects,
-      ArrayList<SemanticMapAction> actions, ArrayList<String[]> address) {
+      ArrayList<SemanticMapAction> actions, ArrayList<SemanticMapTask> tasks,
+      ArrayList<String[]> address) {
     OWLOntology ontology = this.createOWLMapDescription(namespace, map_id,
       objects, address);
 
@@ -71,6 +76,10 @@ public class SemanticMapToOWLExport extends OWLImportExport {
         
         for(SemanticMapAction map_act : actions) {
           createActionClass(map_act, ontology);
+        }
+        
+        for(SemanticMapTask map_tsk : tasks) {
+          createTaskClass(map_tsk, ontology);
         }
       } catch (Exception e) {
         ontology = null;
@@ -98,7 +107,7 @@ public class SemanticMapToOWLExport extends OWLImportExport {
         actSuperClass = factory.getOWLClass(s.getIRI(), pm);
       }
       else if(!classIRI.isAbsolute()) {
-        actSuperClass = factory.getOWLClass("knowrob:"+s.getShortName(), pm);
+        actSuperClass = factory.getOWLClass("map:"+s.getShortName(), pm);
       }
       else {
         actSuperClass = factory.getOWLClass(classIRI);
@@ -135,6 +144,109 @@ public class SemanticMapToOWLExport extends OWLImportExport {
     }
     
     return actClass;
+  }
+  
+  public OWLClass createTaskClass(SemanticMapTask mapTask, OWLOntology
+      ontology) {
+    OWLOntologyManager manager = ontology.getOWLOntologyManager();
+    OWLDataFactory factory = manager.getOWLDataFactory();
+    DefaultPrefixManager pm = PREFIX_MANAGER;
+    
+    OWLClass tskClass = factory.getOWLClass(
+      "map:"+mapTask.getShortName(), pm);
+    manager.addAxiom(ontology, factory.getOWLDeclarationAxiom(tskClass));
+    OWLClass tskSuperClass = null;
+    
+    for(org.knowrob.owl.OWLClass s : mapTask.getSuperClasses()) {
+      IRI classIRI = IRI.create(s.getIRI());
+      if(pm.getPrefix(classIRI.getNamespace()) != null) {
+        tskSuperClass = factory.getOWLClass(s.getIRI(), pm);
+      }
+      else if(!classIRI.isAbsolute()) {
+        tskSuperClass = factory.getOWLClass("map:"+s.getShortName(), pm);
+      }
+      else {
+        tskSuperClass = factory.getOWLClass(classIRI);
+      }
+    
+      manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(tskClass,
+        tskSuperClass)); 
+    }
+    
+    OWLNaryBooleanClassExpression tskExpr = null;
+    HashSet<OWLClassExpression> tskRestr = new HashSet<OWLClassExpression>();
+    Vector<OWLClass> actClasses = new Vector<OWLClass>();
+    
+    for(SemanticMapAction a : mapTask.getActions()) {
+      IRI actIRI = IRI.create(a.getIRI());
+      OWLClass actClass = null;
+      
+      if(pm.getPrefix(actIRI.getNamespace()) != null) {
+        actClass = factory.getOWLClass(a.getIRI(), pm);
+      }
+      else if(!actIRI.isAbsolute()) {
+        actClass = factory.getOWLClass("map:"+a.getShortName(), pm);
+      }
+      else {
+        actClass = factory.getOWLClass(actIRI);
+      }
+      actClasses.add(actClass);
+      
+      OWLObjectProperty subActionProp = factory.getOWLObjectProperty(
+        "knowrob:subAction", pm);
+      OWLClassExpression actExpr = factory.getOWLObjectSomeValuesFrom(
+        subActionProp, actClass);
+      
+      tskRestr.add(actExpr);
+    }
+    
+    if(mapTask.getQuantification() == SemanticMapTask.Quantification.UNION_OF) {
+      tskExpr = factory.getOWLObjectUnionOf(tskRestr);
+    }
+    else {
+      if(mapTask.getOrdered()) {
+        for(int i = 0; i < actClasses.size(); i++) {
+          for(int j = i+1; j < actClasses.size(); j++) {
+            OWLClass ordClass = factory.getOWLClass(
+              "map:"+mapTask.getShortName()+"_Ordering"+i+j, pm);
+            manager.addAxiom(ontology, factory.getOWLDeclarationAxiom(
+              ordClass));
+              
+            OWLClass ordSuperClass = factory.getOWLClass(
+              "knowrob:PartialOrdering-Strict", pm);
+            manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(ordClass,
+              ordSuperClass)); 
+
+            OWLObjectProperty beforeProp = factory.getOWLObjectProperty(
+              "knowrob:occursBeforeInOrdering", pm);
+            OWLClassExpression beforeExpr = factory.getOWLObjectSomeValuesFrom(
+              beforeProp, actClasses.get(i));
+            manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
+              ordClass, beforeExpr));
+              
+            OWLObjectProperty afterProp = factory.getOWLObjectProperty(
+              "knowrob:occursAfterInOrdering", pm);
+            OWLClassExpression afterExpr = factory.getOWLObjectSomeValuesFrom(
+              afterProp, actClasses.get(j));
+            manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
+              ordClass, afterExpr));
+          
+            OWLObjectProperty ordProp = factory.getOWLObjectProperty(
+              "knowrob:orderingConstraints", pm);
+            OWLClassExpression ordExpr = factory.getOWLObjectSomeValuesFrom(
+              ordProp, ordClass);
+              
+            tskRestr.add(ordExpr);
+          }
+        }
+      }
+    
+      tskExpr = factory.getOWLObjectIntersectionOf(tskRestr);
+    }
+    manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
+      tskClass, tskExpr));
+      
+    return tskClass;
   }
   
   @Override
