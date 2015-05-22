@@ -9,6 +9,32 @@ import org.knowrob.map.SemanticMapObject;
 
 public class SemanticMapAction extends OWLClass {
   /**
+  * Assertion of the action
+  */
+  protected Boolean asserted = false;
+  
+  /**
+  * Quantification of subactions
+  */
+  public enum Quantification {
+    INTERSECTION_OF,
+    UNION_OF
+  };
+  
+  protected Quantification quantification = Quantification.INTERSECTION_OF;
+  
+  /**
+  * Ordering of subactions
+  */
+  protected Boolean unordered = false;
+  
+  /**
+  * Subactions
+  */
+  protected Vector<SemanticMapAction> subactions = new
+    Vector<SemanticMapAction>();
+  
+  /**
    * Constructor. Set the IRI and optionally a label. If none is given, 
    * it is initialized with the IRI's short name.
    * 
@@ -67,16 +93,32 @@ public class SemanticMapAction extends OWLClass {
   }
 
   /**
+  * Get asserted.
+  *
+  * @return
+  */
+  public Boolean getAsserted() {
+    return this.asserted;
+  }
+
+  /**
+  * Set asserted.
+  * 
+  * @param asserted
+  */
+  public void setAsserted(Boolean asserted) {
+    this.asserted = asserted;
+  }
+  
+  /**
   * Get object acted on.
   *
   * @return
   */
   public SemanticMapObject getObjectActedOn() {
-    Map<String, Vector<String>> hasValue = this.getHasValue();
-    
-    if(hasValue.containsKey("knowrob:objectActedOn")) {
+    if(has_value.containsKey("knowrob:objectActedOn")) {
       return SemanticMapObject.getSemanticMapObject(
-        hasValue.get("knowrob:objectActedOn").get(0));
+        has_value.get("knowrob:objectActedOn").get(0));
     }
     else {
       return null;
@@ -86,11 +128,9 @@ public class SemanticMapAction extends OWLClass {
   /**
   * Set object acted on.
   * 
-  * @param stamp
+  * @param objectActedOn
   */
   public void setObjectActedOn(SemanticMapObject objectActedOn) {
-    Map<String, Vector<String>> hasValue = this.getHasValue();
-
     if(!has_value.containsKey("knowrob:objectActedOn")) {
       has_value.put("knowrob:objectActedOn", new Vector<String>());
     }
@@ -100,5 +140,65 @@ public class SemanticMapAction extends OWLClass {
   
   public void setObjectActedOn(String iri) {
     this.setObjectActedOn(SemanticMapObject.getSemanticMapObject(iri));
+  }
+  
+  /**
+  * Get quantification.
+  *
+  * @return
+  */
+  public Quantification getQuantification() {
+    return this.quantification;
+  }
+
+  /**
+  * Set quantification.
+  *
+  * @param quantification
+  */
+  public void setQuantification(Quantification quantification) {
+    this.quantification = quantification;
+  }
+  
+  /**
+  * Get unordered.
+  *
+  * @return
+  */
+  public Boolean getUnordered() {
+    return this.unordered;
+  }
+
+  /**
+  * Set unordered.
+  *
+  * @param unordered
+  */
+  public void setUnordered(Boolean unordered) {
+    this.unordered = unordered;
+  }
+  
+  /**
+  * Get subactions.
+  *
+  * @return
+  */
+  public Vector<SemanticMapAction> getSubactions() {
+    return this.subactions;
+  }
+
+  /**
+  * Add subaction.
+  * 
+  * @param stamp
+  */
+  public void addSubaction(SemanticMapAction subaction) {
+    if(!this.subactions.contains(subaction)) {
+      this.subactions.add(subaction);
+    }
+  }
+  
+  public void addSubaction(String iri) {
+    this.addSubaction(SemanticMapAction.getSemanticMapAction(iri));
   }
 }

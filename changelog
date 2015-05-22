@@ -1,3 +1,10 @@
+knowrob-semantic-map-to-owl (1.0.1-10) unstable; urgency=low
+
+  * Merged SemanticMapTask and SemanticMapActionInstance classes into
+    SemanticMapAction class
+
+ -- Ralf Kaestner <ralf.kaestner@gmail.com>  Fri, 22 May 2015 16:53:00 +0100
+
 knowrob-semantic-map-to-owl (1.0.1-9) unstable; urgency=low
 
   * Server now handles semantic map tasks

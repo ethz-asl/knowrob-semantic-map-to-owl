@@ -55,16 +55,14 @@ public class SemanticMapToOWLExport extends OWLImportExport {
 
   public OWLOntology createOWLMapWithActionDescription(
       String namespace, String map_id, ArrayList<ObjectInstance> objects,
-      ArrayList<SemanticMapAction> actions, ArrayList<SemanticMapTask>
-      tasks) {
+      ArrayList<SemanticMapAction> actions) {
     return this.createOWLMapWithActionDescription(namespace, map_id,
-      objects, actions, tasks, null);
+      objects, actions, null);
   }
   
   public OWLOntology createOWLMapWithActionDescription(
       String namespace, String map_id, ArrayList<ObjectInstance> objects,
-      ArrayList<SemanticMapAction> actions, ArrayList<SemanticMapTask> tasks,
-      ArrayList<String[]> address) {
+      ArrayList<SemanticMapAction> actions, ArrayList<String[]> address) {
     OWLOntology ontology = this.createOWLMapDescription(namespace, map_id,
       objects, address);
 
@@ -76,12 +74,12 @@ public class SemanticMapToOWLExport extends OWLImportExport {
         
         for(SemanticMapAction map_act : actions) {
           createActionClass(map_act, ontology);
-        }
-        
-        for(SemanticMapTask map_tsk : tasks) {
-          createTaskClass(map_tsk, ontology);
-        }
-      } catch (Exception e) {
+          if(map_act.getAsserted()) {
+            createActionInst(map_act, ontology);
+          }
+        }        
+      }
+      catch(Exception e) {
         ontology = null;
         e.printStackTrace();
       }
@@ -143,110 +141,100 @@ public class SemanticMapToOWLExport extends OWLImportExport {
         objectActedOnHasValue));
     }
     
+    if(!mapAction.getSubactions().isEmpty()) {
+      OWLNaryBooleanClassExpression subactExpr = null;
+      HashSet<OWLClassExpression> subactRestr = new
+        HashSet<OWLClassExpression>();
+      Vector<OWLClass> subactClasses = new Vector<OWLClass>();
+      
+      for(SemanticMapAction subact : mapAction.getSubactions()) {
+        IRI subactIRI = IRI.create(subact.getIRI());
+        OWLClass subactClass = null;
+        
+        if(pm.getPrefix(subactIRI.getNamespace()) != null) {
+          subactClass = factory.getOWLClass(subact.getIRI(), pm);
+        }
+        else if(!subactIRI.isAbsolute()) {
+          subactClass = factory.getOWLClass("map:"+subact.getShortName(), pm);
+        }
+        else {
+          subactClass = factory.getOWLClass(subactIRI);
+        }
+        subactClasses.add(subactClass);
+        
+        OWLObjectProperty subactProp = factory.getOWLObjectProperty(
+          "knowrob:subAction", pm);
+        subactRestr.add(factory.getOWLObjectSomeValuesFrom(subactProp,
+          subactClass));
+      }
+      
+      if(mapAction.getQuantification() ==
+          SemanticMapAction.Quantification.INTERSECTION_OF) {
+        if(!mapAction.getUnordered()) {
+          for(int i = 0; i < subactClasses.size(); i++) {
+            for(int j = i+1; j < subactClasses.size(); j++) {
+              OWLClass ordClass = factory.getOWLClass(
+                "map:"+mapAction.getShortName()+"_Ordering"+i+j, pm);
+              manager.addAxiom(ontology, factory.getOWLDeclarationAxiom(
+                ordClass));
+                
+              OWLClass ordSuperClass = factory.getOWLClass(
+                "knowrob:PartialOrdering-Strict", pm);
+              manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(ordClass,
+                ordSuperClass)); 
+
+              OWLObjectProperty beforeProp = factory.getOWLObjectProperty(
+                "knowrob:occursBeforeInOrdering", pm);
+              OWLClassExpression beforeExpr = factory.getOWLObjectSomeValuesFrom(
+                beforeProp, subactClasses.get(i));
+              manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
+                ordClass, beforeExpr));
+                
+              OWLObjectProperty afterProp = factory.getOWLObjectProperty(
+                "knowrob:occursAfterInOrdering", pm);
+              OWLClassExpression afterExpr = factory.getOWLObjectSomeValuesFrom(
+                afterProp, subactClasses.get(j));
+              manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
+                ordClass, afterExpr));
+            
+              OWLObjectProperty ordProp = factory.getOWLObjectProperty(
+                "knowrob:orderingConstraints", pm);
+              OWLClassExpression ordExpr = factory.getOWLObjectSomeValuesFrom(
+                ordProp, ordClass);
+                
+              subactRestr.add(ordExpr);
+            }
+          }
+        }
+      
+        subactExpr = factory.getOWLObjectIntersectionOf(subactRestr);
+      }
+      else {
+        subactExpr = factory.getOWLObjectUnionOf(subactRestr);
+      }
+      
+      manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
+        actClass, subactExpr));
+    }
+    
     return actClass;
   }
   
-  public OWLClass createTaskClass(SemanticMapTask mapTask, OWLOntology
-      ontology) {
+  public OWLNamedIndividual createActionInst(SemanticMapAction mapAction,
+      OWLOntology ontology) {
     OWLOntologyManager manager = ontology.getOWLOntologyManager();
     OWLDataFactory factory = manager.getOWLDataFactory();
     DefaultPrefixManager pm = PREFIX_MANAGER;
-    
-    OWLClass tskClass = factory.getOWLClass(
-      "map:"+mapTask.getShortName(), pm);
-    manager.addAxiom(ontology, factory.getOWLDeclarationAxiom(tskClass));
-    OWLClass tskSuperClass = null;
-    
-    for(org.knowrob.owl.OWLClass s : mapTask.getSuperClasses()) {
-      IRI classIRI = IRI.create(s.getIRI());
-      if(pm.getPrefix(classIRI.getNamespace()) != null) {
-        tskSuperClass = factory.getOWLClass(s.getIRI(), pm);
-      }
-      else if(!classIRI.isAbsolute()) {
-        tskSuperClass = factory.getOWLClass("map:"+s.getShortName(), pm);
-      }
-      else {
-        tskSuperClass = factory.getOWLClass(classIRI);
-      }
-    
-      manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(tskClass,
-        tskSuperClass)); 
-    }
-    
-    OWLNaryBooleanClassExpression tskExpr = null;
-    HashSet<OWLClassExpression> tskRestr = new HashSet<OWLClassExpression>();
-    Vector<OWLClass> actClasses = new Vector<OWLClass>();
-    
-    for(SemanticMapAction a : mapTask.getActions()) {
-      IRI actIRI = IRI.create(a.getIRI());
-      OWLClass actClass = null;
-      
-      if(pm.getPrefix(actIRI.getNamespace()) != null) {
-        actClass = factory.getOWLClass(a.getIRI(), pm);
-      }
-      else if(!actIRI.isAbsolute()) {
-        actClass = factory.getOWLClass("map:"+a.getShortName(), pm);
-      }
-      else {
-        actClass = factory.getOWLClass(actIRI);
-      }
-      actClasses.add(actClass);
-      
-      OWLObjectProperty subActionProp = factory.getOWLObjectProperty(
-        "knowrob:subAction", pm);
-      OWLClassExpression actExpr = factory.getOWLObjectSomeValuesFrom(
-        subActionProp, actClass);
-      
-      tskRestr.add(actExpr);
-    }
-    
-    if(mapTask.getQuantification() == SemanticMapTask.Quantification.UNION_OF) {
-      tskExpr = factory.getOWLObjectUnionOf(tskRestr);
-    }
-    else {
-      if(mapTask.getOrdered()) {
-        for(int i = 0; i < actClasses.size(); i++) {
-          for(int j = i+1; j < actClasses.size(); j++) {
-            OWLClass ordClass = factory.getOWLClass(
-              "map:"+mapTask.getShortName()+"_Ordering"+i+j, pm);
-            manager.addAxiom(ontology, factory.getOWLDeclarationAxiom(
-              ordClass));
-              
-            OWLClass ordSuperClass = factory.getOWLClass(
-              "knowrob:PartialOrdering-Strict", pm);
-            manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(ordClass,
-              ordSuperClass)); 
 
-            OWLObjectProperty beforeProp = factory.getOWLObjectProperty(
-              "knowrob:occursBeforeInOrdering", pm);
-            OWLClassExpression beforeExpr = factory.getOWLObjectSomeValuesFrom(
-              beforeProp, actClasses.get(i));
-            manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
-              ordClass, beforeExpr));
-              
-            OWLObjectProperty afterProp = factory.getOWLObjectProperty(
-              "knowrob:occursAfterInOrdering", pm);
-            OWLClassExpression afterExpr = factory.getOWLObjectSomeValuesFrom(
-              afterProp, actClasses.get(j));
-            manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
-              ordClass, afterExpr));
-          
-            OWLObjectProperty ordProp = factory.getOWLObjectProperty(
-              "knowrob:orderingConstraints", pm);
-            OWLClassExpression ordExpr = factory.getOWLObjectSomeValuesFrom(
-              ordProp, ordClass);
-              
-            tskRestr.add(ordExpr);
-          }
-        }
-      }
+    OWLClass actClass = factory.getOWLClass(
+      "map:"+mapAction.getShortName(), pm);
+    OWLNamedIndividual actInstance = factory.getOWLNamedIndividual(
+      "map:"+mapAction.getShortName()+"_Assertion", pm);
     
-      tskExpr = factory.getOWLObjectIntersectionOf(tskRestr);
-    }
-    manager.addAxiom(ontology, factory.getOWLSubClassOfAxiom(
-      tskClass, tskExpr));
-      
-    return tskClass;
+    manager.addAxiom(ontology, factory.getOWLClassAssertionAxiom(actClass,
+      actInstance)); 
+    
+    return actInstance;
   }
   
   @Override

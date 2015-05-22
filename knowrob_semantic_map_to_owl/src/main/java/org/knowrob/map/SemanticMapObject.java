@@ -41,7 +41,6 @@ public class SemanticMapObject extends ObjectInstance {
     this.frame = new String();
   }
   
-  
   /**
   * SemanticMapObject factory. Return existing instance, if available, and
   * create new SemanticMapObject instance if necessary. Avoids duplicate

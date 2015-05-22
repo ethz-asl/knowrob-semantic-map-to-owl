@@ -30,10 +30,6 @@ import org.knowrob.owl.utils.PackageIRIMapper;
 
 import knowrob_semantic_map_msgs.*;
 
-import org.knowrob.map.SemanticMapAction;
-import org.knowrob.map.SemanticMapObject;
-import org.knowrob.map.SemanticMapToOWLExport;
-
 /**
 * ROS service to convert a mod_semantic_map/SemMap message into an OWL
 * description
@@ -124,13 +120,10 @@ public class SemanticMapToOWL extends AbstractNodeMain {
           req.getMap().getObjects());
         HashMap<String, SemanticMapAction> mas = semMapAct2MapAct(namespace,
           req.getMap().getActions());
-        HashMap<String, SemanticMapTask> mts = semMapTask2MapTask(namespace,
-          req.getMap().getTasks());
           
         OWLOntology owlmap = export.createOWLMapWithActionDescription(
           namespace, id,  new ArrayList<ObjectInstance>(mos.values()),
-          new ArrayList<SemanticMapAction>(mas.values()),
-          new ArrayList<SemanticMapTask>(mts.values()), address);
+          new ArrayList<SemanticMapAction>(mas.values()), address);
         
         OWLOntologyManager manager = owlmap.getOWLOntologyManager();
         PackageIRIMapper im = new PackageIRIMapper();
@@ -166,8 +159,7 @@ public class SemanticMapToOWL extends AbstractNodeMain {
         }
         
         for(SemMapObjectProperty smop : req.getMap().getObjectProperties()) {
-          if((mos.get(smop.getSubject()) != null) &&
-              (mos.get(smop.getObject()) != null)) {
+          if(mos.get(smop.getSubject()) != null) {
             // object properties linked to map object individuals get
             // instantiated as OWL object properties
             OWLObjectProperty op = null;
@@ -202,9 +194,8 @@ public class SemanticMapToOWL extends AbstractNodeMain {
               factory.getOWLObjectPropertyAssertionAxiom(op, subjInd, objInd);
             manager.addAxiom(owlmap, opAxiom);
           }
-          else if((mas.get(smop.getSubject()) != null) ||
-              (mts.get(smop.getSubject()) != null)) {
-            // object properties linked to map action/task classes get
+          else if(mas.get(smop.getSubject()) != null) {
+            // object properties linked to map action classes get
             // instantiated as OWL restrictions on object properties
             OWLObjectProperty op = null;
             org.semanticweb.owlapi.model.OWLClass actClass = null;
@@ -288,9 +279,8 @@ public class SemanticMapToOWL extends AbstractNodeMain {
             
             manager.addAxiom(owlmap, dpAxiom);
           }
-          else if((mas.get(smdp.getSubject()) != null) ||
-              (mts.get(smdp.getSubject()) != null)) {
-            // data properties linked to map action/task classes get
+          else if(mas.get(smdp.getSubject()) != null) {
+            // data properties linked to map action classes get
             // instantiated as OWL restrictions on data properties
             OWLDataProperty dp = null;
             org.semanticweb.owlapi.model.OWLClass actClass = null;
@@ -390,37 +380,21 @@ public class SemanticMapToOWL extends AbstractNodeMain {
       mas.put(sma.getId(), ma);
 
       ma.addSuperClass(OWLClass.getOWLClass(sma.getType()));
+      ma.setAsserted(sma.getAsserted());
       ma.setObjectActedOn(sma.getObjectActedOn());
+            
+      for(String iri : sma.getSubactions()) {
+        ma.addSubaction(iri);
+      }
+      if(sma.getQuantification() == SemMapAction.UNION_OF) {
+        ma.setQuantification(SemanticMapAction.Quantification.UNION_OF);
+      }
+      else {
+        ma.setQuantification(SemanticMapAction.Quantification.INTERSECTION_OF);
+      }
+      ma.setUnordered(sma.getUnordered());
     }
 
     return mas;
-  }
-  
-  private HashMap<String, SemanticMapTask> semMapTask2MapTask(String map_id,
-      List<SemMapTask> smts) {
-    HashMap<String, SemanticMapTask> mts = new
-      HashMap<String, SemanticMapTask>();
-
-    for(SemMapTask smt : smts) {
-      SemanticMapTask mt = SemanticMapTask.getSemanticMapTask(
-        smt.getId());
-      mts.put(smt.getId(), mt);
-
-      mt.addSuperClass(OWLClass.getOWLClass(smt.getType()));
-      
-      if(smt.getQuantification() == SemMapTask.UNION_OF) {
-        mt.setQuantification(SemanticMapTask.Quantification.UNION_OF);
-      }
-      else {
-        mt.setQuantification(SemanticMapTask.Quantification.INTERSECTION_OF);
-      }
-      mt.setOrdered(smt.getOrdered());
-      
-      for(String iri : smt.getActions()) {
-        mt.addAction(iri);
-      }
-    }
-
-    return mts;
   }
 }
